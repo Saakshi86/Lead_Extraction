@@ -1,25 +1,22 @@
-import requests
-from bs4 import BeautifulSoup
-import urllib
+import json
+import numpy as np
 import pandas as pd
-from time import sleep
-import smtplib
-from email.message import EmailMessage
-import ratelim
 import datetime
-import csv
-import time
+from googleapiclient.discovery import build
 import os.path
 from os import path
+import urllib
 
 
-keywords = ["M&A","Mergers and Acquisitions","Corporate Development","Corporate Strategy","CFO","cheif financial officer","Strategic initiatives","CEO","Cheif execution offficer"]
+#keywords = ["M&A","Mergers & Acquisitions","Mergers and Acquisitions","Corporate Development","Corporate Strategy","CFO","cheif financial officer","Strategic initiatives","CEO","Cheif execution offficer"]
+keywords = ["Partner", "Managing Partner", "Principle"]
 column_names = ["Name","keyword","Link 1","Link 2","Link 3","Link 4","Link 5"]
 company_names = []
-response_code = 200
 resultCount = 5
 filePath = r"D:\\python-workspace\files\\"
-sourceFile = "tech_trail_10k.xlsx"
+sourceFile = filePath + "tech_trail 10k.xlsx"
+api_key = 'xxxxxxx'
+search_engine_id = 'xxxxxxx'
 
 def save_csv(name, keyName, link_arr):
     listt = []
@@ -30,7 +27,7 @@ def save_csv(name, keyName, link_arr):
         for index in range(resultCount):
             print(index)
             if index < len(link_arr):
-                newList.insert(index, link_arr[index]);
+                newList.insert(index, link_arr[index])
             else:
                 newList.insert(index, "NA")
     else:
@@ -53,45 +50,28 @@ def save_csv(name, keyName, link_arr):
 
     
 
-@ratelim.patient(9,45)
 def call_api(search_query, company):
     print(search_query)
     link_arr = []
-    api_key = 'AIzaSyC8E_VqSDA7Dd8okXclmO3n70aglDuUAL0'
-    page = requests.get(f"https://google.com/search?q={search_query}&num={resultCount}",auth = (api_key,'')) 
-    global response_code
-    response_code=page.status_code
-    if page.status_code==200:
-        
-        soup = BeautifulSoup(page.content, "html.parser")   
-        links = soup.findAll("a")     
+    urls = []
+    service = build("customsearch", "v1", developerKey = api_key)
+    response = service.cse().list(q = search_query, cx = search_engine_id, start = 0, num = resultCount).execute()
 
-
-        result1 = soup.findAll({"class": "eqAnXb D0ONmb"})
-        result2 = soup.findAll({"class":"ULSxyf"})
-        result3 = soup.findAll({"class":"v3jTId"})
-        a = "NO RESULT FOUND"
-        if len(result1)>0:
-            link_arr.append(a)
-            return link_arr
-                
-        elif len(result2)>0:
-            link_arr.append(a)
-            return link_arr
-              
-        elif len(result3)>0:
-            link_arr.append(a)
-            return link_arr
-        
-        for link in links:                      
-            link_href = link.get('href')
-            if "url?q=" in link_href and not "webache" in link_href:
-                url = link.get('href').split("?q=")[1].split("&sa=U")[0]
-                link_arr.append(url)
-        return link_arr             
+    #print(response)
     
+    if "items" in response:
+        print("resultes items found")
+        for item in response['items']:
+            urls.append(item['formattedUrl'])
+            
+        print(urls)
+        link_arr = urls[:resultCount]
+        
     else:
-        return link_arr
+        print("items key doesn't exist in the response data")
+        
+
+    return link_arr  
     
 def main_function():
     no_of_companies = 1
@@ -112,15 +92,16 @@ def main_function():
     global company_names
     company_names = list(df['Company Name'])
     for company in company_names:
+        print("fetching for company: " + company)
         for keyword in keywords:
-            search_query = urllib.parse.quote(company) + "%20"+ urllib.parse.quote(keyword) + '%20site:linkedin.com/in%20-intitle:profiles' #taking keywords and company name from array
-            if(response_code==200):
-                print("call function for [ " + company + " ] [" + keyword +" ]")
-                urlList = call_api(search_query,company)
-                if len(urlList) > 0:
-                    save_csv(company, keyword, urlList)
-                time.sleep(5)
-            else:
-                print("call_api() function called off due to response status code: " + str(response_code))
+            print("fetching for keyword: " + keyword)
+            #search_query = urllib.parse.quote(company) + "%20"+ urllib.parse.quote(keyword) + '%20site:linkedin.com/in%20-intitle:profiles' #taking keywords and company name from array
+            search_query = company + " "+ keyword + ' site:linkedin.com/in -intitle:profiles' 
+            print("call function for [ " + company + " ] [ " + keyword +" ]")
+            urlList = call_api(search_query, company)
+            if len(urlList) > 0 & len(urlList) <= 5:
+                save_csv(company, keyword, urlList)
                 break
+            
 main_function()
+
