@@ -55,7 +55,7 @@ def call_api(search_query, company):
     link_arr = []
     urls = []
     service = build("customsearch", "v1", developerKey = api_key)
-    response = service.cse().list(q = search_query, cx = search_engine_id, start = 0, num = resultCount).execute()
+    response = service.cse().list(q = search_query, cx = search_engine_id, exactTerms = company, start = 0, num = resultCount).execute()
 
     #print(response)
     
